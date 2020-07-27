@@ -1,0 +1,401 @@
+# CARRE FOUR
+
+As Data analyst at Carrefour Kenya, I am currently undertaking a project that will inform the marketing department on the most relevant marketing strategies that will result in the highest no. of sales (total price including tax). The project has been divided into four parts where you'll explore a recent marketing dataset by performing various unsupervised learning techniques and later providing recommendations based on your insights.
+
+## Dimensionality reduction
+#### load in the dataset
+```{r}
+supermarket <- read.csv("C:/Users/leonb/Downloads/Supermarket_Dataset_1 - Sales Data.csv", sep = ",", header = TRUE)
+head(supermarket)
+```
+
+
+#### Checking the data
+```{r}
+str(supermarket)
+# we can see the data types of the variables
+
+colSums(is.na(supermarket))
+# There are no missing values
+
+anyDuplicated(supermarket)
+# There are no duplicates
+
+```
+
+
+```{r}
+# 
+summary(supermarket)
+# We can see the distribution of data
+
+```
+
+
+
+### PCA
+```{r}
+# Selecting the numerical data (excluding the categorical variables vs and am)
+# ---
+# 
+market <- supermarket[,c(6:8, 12, 14:16)]
+head(market)
+
+# checking whether the numerical variables have variances that are equal to zero
+
+which(apply(market, 2, var)==0)
+# the "gross.margin.percentage" column has a zero variance and can not work well for PCA
+
+```
+
+
+```{r}
+# We then pass df to the prcomp(). We also set two arguments, center and scale, 
+# to be TRUE then preview our object with summary
+# ---
+
+market.pca <- prcomp(supermarket[,c(6:8, 12, 14:16)], center = TRUE, scale. = TRUE)
+summary(market.pca)
+```
+As a result we obtain 7 principal components, each which explain a percentate of the total variation of the dataset PC1 explains 70% of the total variance, which means that nearly two-thirds of the information in the dataset (9 variables) can be encapsulated by just that one Principal Component. PC2 explains 14% of the variance. 
+
+```{r}
+# Calling str() to have a look at your PCA object 
+
+str(market.pca)
+
+```
+```{r}
+# Installing the necessary libaries and packages
+
+library(devtools)
+install_github("vqv/ggbiplot", force = TRUE)
+
+```
+
+
+```{r}
+library(ggbiplot)
+# Plotting the pca 
+
+ggbiplot(market.pca)
+```
+
+From the graph we will see that the variables quantity, unit price, gross income and rating contribute to PC2, 
+
+with higher values in those variables moving the samples to the right on the plot.
+
+```{r}
+
+# Adding more detail to the plot, we provide arguments rownames as labels
+# 
+ggbiplot(market.pca, labels=rownames(supermarket), obs.scale = 1, var.scale = 1)
+
+```
+
+```{r}
+# 
+market.customer <- c(rep("Normal", 499), rep("Member",501))
+
+ggbiplot(market.pca,ellipse=TRUE,  labels=rownames(supermarket), groups=market.customer, obs.scale = 1, var.scale = 1)
+```
+there is a very small difference when identifying a normal customer or a member of the supermarket.
+
+
+### T-SNE
+```{r}
+# Install rtse package
+library(Rtsne)
+```
+
+```{r}
+# Curating the database for analysis 
+# 
+customer<-supermarket$Customer.type
+customer<-as.factor(customer)
+
+# For plotting
+#
+colors = rainbow(length(unique(customer)))
+names(colors) = unique(customer)
+
+```
+
+```{r}
+
+# Executing the algorithm on curated data
+# 
+tsne <- Rtsne(supermarket[,-3], dims = 2, perplexity=30, verbose=TRUE, max_iter = 500)
+
+```
+
+```{r}
+
+# Getting the duration of execution
+# 
+exeTimeTsne <- system.time(Rtsne(supermarket[,-3], dims = 2, perplexity=30, verbose=TRUE, max_iter = 500))
+
+```
+
+```{r}
+# Plotting our graph and closely examining the graph
+# 
+plot(tsne$Y, t='n', main="tsne")
+text(tsne$Y, labels=customer, col=colors[customer])
+
+```
+
+
+## Feature selection
+
+#### Load in the dataset
+```{r}
+supermarket <- read.csv("C:/Users/leonb/Downloads/Supermarket_Dataset_1 - Sales Data.csv",
+                        sep = ",", header = TRUE, row.names = 1)
+head(supermarket)
+```
+
+```{r}
+# We install and load our wskm package
+# ---
+#
+suppressWarnings(
+  suppressMessages(if
+                   (!require(wskm, quietly=TRUE))
+    install.packages("wskm")))
+library(wskm)
+```
+
+
+```{r}
+set.seed(2)
+
+market <- supermarket[,c(6:8, 12, 14:16)]
+head(market)
+
+model <- ewkm(market[1:7], 3, lambda=2, maxiter=1000)
+```
+
+```{r}
+
+# Loading and installing our cluster package
+# ---
+#
+suppressWarnings(
+  suppressMessages(if
+                   (!require(cluster, quietly=TRUE))
+    install.packages("cluster")))
+library("cluster")
+```
+
+```{r}
+# Cluster Plot against 1st 2 principal components
+# ---
+#
+clusplot(market[1:7], model$cluster, color=TRUE, shade=TRUE,
+         labels=2, lines=1,main='Cluster Analysis for supermarket')
+
+```
+
+
+Weights are calculated for each variable and cluster. They are a measure of the relative importance of each variable with regards to the membership of the observations to that cluster. The weights are incorporated into the distance function, typically reducing the distance for more important variables.Weights remain stored in the model and we can check them as follows:
+
+```{r}
+
+round(model$weights*100,2)
+
+# tax and gross income had 50% on cluster 1 and 50% on cluster 3 while rating had 99.99% on cluster 2
+```
+
+## Association rules
+```{r}
+# load in the dataset
+transactions <- read.transactions("C:/Users/leonb/Downloads/Supermarket_Sales_Dataset II.csv", sep = ",", header = TRUE)
+head(transactions)
+
+```
+
+
+
+
+```{r}
+# We first we install the required arules library 
+#
+install.packages("arules")
+
+# Loading the arules library
+#
+library(arules)
+
+```
+
+```{r}
+# checking class type
+class(supermarket1)
+
+```
+
+
+```{r}
+# Previewing our first 5 transactions
+#
+inspect(transactions)
+
+# Previewing our first 10 transactions
+items <- as.data.frame(itemLabels(transactions))
+colnames(items) <- "Item"
+head(items, 10)
+```
+
+```{r}
+
+# Generating a summary of the transaction dataset
+# This would give us some information such as the most purchased items, 
+# distribution of the item sets (no. of items purchased in each transaction)
+
+summary(transactions)
+
+```
+
+
+```{r}
+# Exploring the frequency of some articles 
+# i.e. transacations ranging from 8 to 10 and performing 
+# some operation in percentage terms of the total transactions
+
+itemFrequency(supermarket1[, 8:10],type = "absolute")
+round(itemFrequency(supermarket1[, 8:10],type = "relative")*100,2)
+```
+
+```{r}
+# Displaying top 10 most common items in the transactions dataset 
+# and the items whose relative importance is at least 10%
+# 
+par(mfrow = c(1, 2))
+
+# plot the frequency of items
+itemFrequencyPlot(transactions, topN = 10,col="darkgreen")
+itemFrequencyPlot(transactions, support = 0.1,col="darkred")
+```
+
+
+#### Modelling
+```{r}
+# Building a model based on association rules 
+# using the apriori function 
+# We use Min Support as 0.001 and confidence as 0.8
+# 
+rules <- apriori (transactions, parameter = list(supp = 0.001, conf = 0.8))
+rules
+```
+
+We use measures of significance and interest on the rules, determining which ones are interesting and which to discard.However since we built the model using 0.001 Min support and confidence as 0.8 we obtained 73 rules.However, in order to illustrate the sensitivity of the model to these two parameters, we will see what happens if we increase the support or lower the confidence level
+
+```{r}
+# Building a apriori model with Min Support as 0.002 and confidence as 0.8.
+rules2 <- apriori (transactions,parameter = list(supp = 0.002, conf = 0.8)) 
+
+# Building apriori model with Min Support as 0.002 and confidence as 0.6.
+rules3 <- apriori (transactions, parameter = list(supp = 0.001, conf = 0.6)) 
+
+rules2
+
+rules3
+```
+
+In our first example, we increased the minimum support of 0.001 to 0.002 and model rules went from 73 to only 2 This would lead us to understand that using a high level of support can make the model lose interesting rules. In the second example, we decreased the minimum confidence level to 0.6 and the number of model rules went from 73 to 543 This would mean that using a low confidence level increases the number of rules to quite an extent and many will not be useful.
+
+```{r}
+# We can perform an exploration of our model through the use of the summary function as shown
+# Upon running the code, the function would give us information about the model 
+# i.e. the size of rules, depending on the items that contain these rules. 
+# In our above case, most rules have 4 and 5 items though some rules do have upto 6. 
+# More statistical information such as support, lift and confidence is also provided.
+# 
+summary(rules)
+```
+
+```{r}
+# Observing rules built in our model i.e. first 5 model rules
+
+rules<-sort(rules, by="confidence", decreasing=TRUE)
+
+inspect(rules[1:5]) # The given five rules have a confidence of 100 except the last one which has 95% confidence
+
+```
+
+If we're interested in making a promotion relating to the sale of milk, we could create a subset of rules concerning these products. This would tell us the items that the customers bought before purchasing milk
+
+```{r}
+milk <- subset(rules, subset = rhs %pin% "milk")
+
+# Then order by confidence
+milk <- sort(milk, by="confidence", decreasing=TRUE)
+inspect(milk[1:5])
+
+```
+
+What if we wanted to determine items that customers might buy who have previously bought milk?
+```{r}
+# Subset the rules
+milk <- subset(rules, subset = lhs %pin% "milk")
+
+# Order by confidence
+milk<-sort(milk, by="confidence", decreasing=TRUE)
+
+# inspect top 5
+inspect(milk[15:19])
+
+```
+
+## Anomaly detection
+```{r}
+# load in the dataset
+
+supermarket2 <- read.csv("C:/Users/leonb/Downloads/Supermarket_Sales_Forecasting - Sales.csv", sep = ",", header = TRUE)
+head(supermarket2)
+```
+
+
+### Installing anomalize package
+```{r}
+
+# ---
+# 
+install.packages("anomalize")
+
+# Load tidyverse and anomalize
+# ---
+# 
+library(tidyverse)
+library(anomalize)
+library(AnomalyDetection)
+
+```
+
+
+### Detecting our anomalies
+```{r}
+data <- supermarket2 %>% 
+  rownames_to_column() %>% 
+  as_tibble() %>% 
+  mutate(Date = as.Date(Date)"%m/%d/%Y") %>% 
+head(data)
+```
+
+
+```{r}
+data %>%
+  group_by(Date) %>%
+  summarise(Sales = sum(Sales)) %>%
+  time_decompose(Sales, frequency = "auto", method = "stl") %>%
+  anomalize(remainder, method = "iqr") %>%
+  time_recompose() %>%
+### Anomaly Visualization
+  plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.25)
+```
+
+There were no anomalies that were detected. 
+
+
+
